@@ -9,7 +9,7 @@ import OpenAI from 'openai'; // OpenAI client
 dotenv.config();
 
 const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY || "-", 
+  apiKey: process.env.OPENAI_API_KEY || "-",
 });
 
 const app = express();
@@ -40,7 +40,7 @@ app.get('/upload-health', (req, res) => {
 app.post("/chat", async (req, res) => {
   const userMessage = req.body.message; // User's question
   const userId = req.body.userId || "default_user";
-  
+
   let responseMessages;
 
   // If a document has been uploaded and stored for this user
@@ -52,7 +52,14 @@ app.post("/chat", async (req, res) => {
     responseMessages = await generateRegularResponse(userId, userMessage);
   }
 
-  res.json({ response: responseMessages });
+  // Generate TTS for the response
+  const ttsAudio = await generateTTS(responseMessages);
+
+  // Send the response with both text and TTS audio
+  res.json({ 
+    response: responseMessages,
+    ttsAudio, // Return the generated TTS audio in base64 format
+  });
 });
 
 // Handle document uploads
@@ -187,7 +194,21 @@ const generateRegularResponse = async (userId, userMessage) => {
     throw error;
   }
 };
+const generateTTS = async (message) => {
+  try {
+    const tts = await openai.audio.speech.create({
+      model: "tts-1",
+      voice: "nova", // Use the desired voice
+      input: message,
+    });
 
+    const buffer = Buffer.from(await tts.arrayBuffer());
+    return buffer.toString("base64"); // Return base64-encoded audio
+  } catch (error) {
+    console.error('Error generating TTS:', error);
+    throw error;
+  }
+};
 // Start the server
 const startServer = () => {
   const port = process.env.PORT || 3000;
